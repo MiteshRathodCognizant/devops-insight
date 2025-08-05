@@ -121,6 +121,22 @@ export const AzureDevOpsSettings = () => {
               rows={2}
             />
           </div>
+
+          <div className="flex gap-2">
+            <Button className="flex-1">
+              Add Personal Access Token
+            </Button>
+            <Button variant="outline" size="sm">
+              <a 
+                href="https://dev.azure.com/vibecode/_usersSettings/tokens" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1"
+              >
+                Get PAT from Azure DevOps
+              </a>
+            </Button>
+          </div>
           
           <p className="text-xs text-muted-foreground">
             Your token will be securely encrypted and stored. You can generate a new PAT in your Azure DevOps organization settings.
