@@ -13,6 +13,7 @@ import {
   GitBranch,
   Clock
 } from 'lucide-react';
+import { AzureDevOpsSettings } from '@/components/settings/AzureDevOpsSettings';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -20,14 +21,23 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState('overview');
   const { user, signOut } = useAuth();
 
   const navigation = [
-    { name: 'Overview', href: '#', icon: Home, current: true },
-    { name: 'Pipelines', href: '#', icon: Activity, current: false },
-    { name: 'Branches', href: '#', icon: GitBranch, current: false },
-    { name: 'History', href: '#', icon: Clock, current: false },
+    { name: 'Overview', id: 'overview', icon: Home },
+    { name: 'Pipelines', id: 'pipelines', icon: Activity },
+    { name: 'Branches', id: 'branches', icon: GitBranch },
+    { name: 'History', id: 'history', icon: Clock },
+    { name: 'Settings', id: 'settings', icon: Settings },
   ];
+
+  const renderContent = () => {
+    if (activeView === 'settings') {
+      return <AzureDevOpsSettings />;
+    }
+    return children;
+  };
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-background to-muted">
@@ -44,14 +54,14 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               <X className="h-6 w-6 text-white" />
             </button>
           </div>
-          <SidebarContent navigation={navigation} user={user} signOut={signOut} />
+          <SidebarContent navigation={navigation} user={user} signOut={signOut} activeView={activeView} setActiveView={setActiveView} />
         </div>
       </div>
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex min-h-0 flex-1 flex-col bg-dashboard-sidebar shadow-xl">
-          <SidebarContent navigation={navigation} user={user} signOut={signOut} />
+          <SidebarContent navigation={navigation} user={user} signOut={signOut} activeView={activeView} setActiveView={setActiveView} />
         </div>
       </div>
 
@@ -81,7 +91,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
           <div className="p-6">
-            {children}
+            {renderContent()}
           </div>
         </main>
       </div>
@@ -89,7 +99,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   );
 };
 
-const SidebarContent = ({ navigation, user, signOut }: any) => (
+const SidebarContent = ({ navigation, user, signOut, activeView, setActiveView }: any) => (
   <>
     <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
       <div className="flex flex-shrink-0 items-center px-4">
@@ -98,18 +108,18 @@ const SidebarContent = ({ navigation, user, signOut }: any) => (
       </div>
       <nav className="mt-8 flex-1 space-y-1 px-2">
         {navigation.map((item: any) => (
-          <a
+          <button
             key={item.name}
-            href={item.href}
-            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-              item.current
+            onClick={() => setActiveView(item.id)}
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-200 w-full text-left ${
+              activeView === item.id
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'text-dashboard-sidebar-foreground hover:bg-dashboard-sidebar-foreground/10 hover:text-white'
             }`}
           >
             <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
             {item.name}
-          </a>
+          </button>
         ))}
       </nav>
     </div>
