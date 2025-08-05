@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, CheckCircle, AlertCircle } from 'lucide-react';
+import { Settings, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useAzureDevOps } from '@/hooks/useAzureDevOps';
 
 interface AzureDevOpsConfig {
   organizationUrl: string;
@@ -15,15 +17,29 @@ interface AzureDevOpsConfig {
 
 export const AzureDevOpsSettings = () => {
   const { toast } = useToast();
+  const { initializeConnection } = useAzureDevOps();
   const [config, setConfig] = useState<AzureDevOpsConfig>({
     organizationUrl: 'https://dev.azure.com/vibecode',
     projectName: 'ProjectABC',
     hasToken: false,
   });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [patDialogOpen, setPatDialogOpen] = useState(false);
+  const [personalAccessToken, setPersonalAccessToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+
+  useEffect(() => {
+    // Check if PAT is already stored
+    const storedConfig = localStorage.getItem('azureDevOpsConfig');
+    const storedPat = localStorage.getItem('azureDevOpsPAT');
+    
+    if (storedConfig) {
+      const parsedConfig = JSON.parse(storedConfig);
+      setConfig({ ...parsedConfig, hasToken: !!storedPat });
+    }
+  }, []);
 
   const handleSaveConfig = () => {
-    // Save configuration to localStorage or Supabase
     localStorage.setItem('azureDevOpsConfig', JSON.stringify(config));
     toast({
       title: "Configuration saved",
@@ -31,17 +47,81 @@ export const AzureDevOpsSettings = () => {
     });
   };
 
+  const handleSavePAT = async () => {
+    if (!personalAccessToken.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid Personal Access Token.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Store PAT securely (in production, this should be encrypted)
+      localStorage.setItem('azureDevOpsPAT', personalAccessToken);
+      
+      // Test the connection
+      const success = await initializeConnection(
+        config.organizationUrl,
+        config.projectName,
+        personalAccessToken
+      );
+
+      if (success) {
+        setConfig(prev => ({ ...prev, hasToken: true }));
+        setPatDialogOpen(false);
+        setPersonalAccessToken('');
+        toast({
+          title: "PAT saved successfully",
+          description: "Personal Access Token has been saved and connection verified.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to save PAT",
+        description: "Please check your token and try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const testConnection = async () => {
     setIsTestingConnection(true);
-    // TODO: Implement actual connection test with Azure DevOps API
-    setTimeout(() => {
+    const storedPat = localStorage.getItem('azureDevOpsPAT');
+    
+    if (!storedPat) {
       setIsTestingConnection(false);
       toast({
-        title: "Connection test",
+        title: "No PAT configured",
         description: "Please configure your Personal Access Token first.",
         variant: "destructive",
       });
-    }, 1000);
+      return;
+    }
+
+    try {
+      const success = await initializeConnection(
+        config.organizationUrl,
+        config.projectName,
+        storedPat
+      );
+
+      if (success) {
+        toast({
+          title: "Connection successful",
+          description: "Successfully connected to Azure DevOps!",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection failed",
+        description: "Please check your configuration and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTestingConnection(false);
+    }
   };
 
   return (
@@ -123,15 +203,66 @@ export const AzureDevOpsSettings = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button className="flex-1">
-              Add Personal Access Token
-            </Button>
-            <Button variant="outline" size="sm">
+            <Dialog open={patDialogOpen} onOpenChange={setPatDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex-1">
+                  {config.hasToken ? 'Update' : 'Add'} Personal Access Token
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Personal Access Token</DialogTitle>
+                  <DialogDescription>
+                    Enter your Azure DevOps Personal Access Token to connect to your pipelines.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pat">Personal Access Token</Label>
+                    <div className="relative">
+                      <Input
+                        id="pat"
+                        type={showToken ? "text" : "password"}
+                        value={personalAccessToken}
+                        onChange={(e) => setPersonalAccessToken(e.target.value)}
+                        placeholder="Enter your PAT here..."
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowToken(!showToken)}
+                      >
+                        {showToken ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Required permissions: Build (read), Release (read), Work Items (read), Code (read)
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setPatDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleSavePAT}>
+                    Save & Test Connection
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            <Button variant="outline" size="sm" asChild>
               <a 
                 href="https://dev.azure.com/vibecode/_usersSettings/tokens" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-1"
               >
                 Get PAT from Azure DevOps
               </a>
