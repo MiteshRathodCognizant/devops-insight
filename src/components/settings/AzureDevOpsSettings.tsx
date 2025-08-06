@@ -21,23 +21,30 @@ export const AzureDevOpsSettings = () => {
   const [config, setConfig] = useState<AzureDevOpsConfig>({
     organizationUrl: 'https://dev.azure.com/vibecode',
     projectName: 'ProjectABC',
-    hasToken: false,
+    hasToken: true, // PAT is now static and persistent
   });
   const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [patDialogOpen, setPatDialogOpen] = useState(false);
-  const [personalAccessToken, setPersonalAccessToken] = useState('');
-  const [showToken, setShowToken] = useState(false);
+
+  // Static PAT - hardcoded for persistence
+  const STATIC_PAT = 'your-personal-access-token-here';
 
   useEffect(() => {
-    // Check if PAT is already stored
-    const storedConfig = localStorage.getItem('azureDevOpsConfig');
-    const storedPat = localStorage.getItem('azureDevOpsPAT');
+    // Auto-initialize with static configuration
+    const staticConfig = {
+      organizationUrl: 'https://dev.azure.com/vibecode',
+      projectName: 'ProjectABC',
+      hasToken: true,
+    };
     
-    if (storedConfig) {
-      const parsedConfig = JSON.parse(storedConfig);
-      setConfig({ ...parsedConfig, hasToken: !!storedPat });
-    }
-  }, []);
+    // Store static configuration
+    localStorage.setItem('azureDevOpsConfig', JSON.stringify(staticConfig));
+    localStorage.setItem('azureDevOpsPAT', STATIC_PAT);
+    
+    setConfig(staticConfig);
+    
+    // Auto-initialize connection
+    initializeConnection(staticConfig.organizationUrl, staticConfig.projectName, STATIC_PAT);
+  }, [initializeConnection]);
 
   const handleSaveConfig = () => {
     localStorage.setItem('azureDevOpsConfig', JSON.stringify(config));
@@ -47,76 +54,27 @@ export const AzureDevOpsSettings = () => {
     });
   };
 
-  const handleSavePAT = async () => {
-    if (!personalAccessToken.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid Personal Access Token.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      // Store PAT securely (in production, this should be encrypted)
-      localStorage.setItem('azureDevOpsPAT', personalAccessToken);
-      
-      // Test the connection
-      const success = await initializeConnection(
-        config.organizationUrl,
-        config.projectName,
-        personalAccessToken
-      );
-
-      if (success) {
-        setConfig(prev => ({ ...prev, hasToken: true }));
-        setPatDialogOpen(false);
-        setPersonalAccessToken('');
-        toast({
-          title: "PAT saved successfully",
-          description: "Personal Access Token has been saved and connection verified.",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Failed to save PAT",
-        description: "Please check your token and try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const testConnection = async () => {
     setIsTestingConnection(true);
-    const storedPat = localStorage.getItem('azureDevOpsPAT');
-    
-    if (!storedPat) {
-      setIsTestingConnection(false);
-      toast({
-        title: "No PAT configured",
-        description: "Please configure your Personal Access Token first.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       const success = await initializeConnection(
         config.organizationUrl,
         config.projectName,
-        storedPat
+        STATIC_PAT
       );
 
       if (success) {
         toast({
           title: "Connection successful",
-          description: "Successfully connected to Azure DevOps!",
+          description: "Successfully connected to Azure DevOps with static PAT!",
         });
       }
     } catch (error) {
       toast({
         title: "Connection failed",
-        description: "Please check your configuration and try again.",
+        description: "Please check the static PAT configuration.",
         variant: "destructive",
       });
     } finally {
@@ -179,99 +137,23 @@ export const AzureDevOpsSettings = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            {config.hasToken ? (
-              <>
-                <CheckCircle className="h-4 w-4 text-success" />
-                <span className="text-sm">Personal Access Token is configured</span>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="h-4 w-4 text-warning" />
-                <span className="text-sm">Personal Access Token not configured</span>
-              </>
-            )}
+            <CheckCircle className="h-4 w-4 text-success" />
+            <span className="text-sm">Static Personal Access Token is configured and persistent</span>
           </div>
           
           <div className="space-y-2">
-            <Label>Required Permissions</Label>
+            <Label>Static Configuration</Label>
             <Textarea
               readOnly
-              value="Build (read), Release (read), Work Items (read), Code (read)"
+              value="PAT is hardcoded and will persist across sessions. No manual configuration needed."
               className="text-sm"
               rows={2}
             />
           </div>
 
-          <div className="flex gap-2">
-            <Dialog open={patDialogOpen} onOpenChange={setPatDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex-1">
-                  {config.hasToken ? 'Update' : 'Add'} Personal Access Token
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Personal Access Token</DialogTitle>
-                  <DialogDescription>
-                    Enter your Azure DevOps Personal Access Token to connect to your pipelines.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pat">Personal Access Token</Label>
-                    <div className="relative">
-                      <Input
-                        id="pat"
-                        type={showToken ? "text" : "password"}
-                        value={personalAccessToken}
-                        onChange={(e) => setPersonalAccessToken(e.target.value)}
-                        placeholder="Enter your PAT here..."
-                        className="pr-10"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowToken(!showToken)}
-                      >
-                        {showToken ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Required permissions: Build (read), Release (read), Work Items (read), Code (read)
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setPatDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="button" onClick={handleSavePAT}>
-                    Save & Test Connection
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            <Button variant="outline" size="sm" asChild>
-              <a 
-                href="https://dev.azure.com/vibecode/_usersSettings/tokens" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                Get PAT from Azure DevOps
-              </a>
-            </Button>
+          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+            <strong>Note:</strong> The Personal Access Token is now static and persistent. It will automatically be available every time you use the application without requiring manual input.
           </div>
-          
-          <p className="text-xs text-muted-foreground">
-            Your token will be securely encrypted and stored. You can generate a new PAT in your Azure DevOps organization settings.
-          </p>
         </CardContent>
       </Card>
     </div>
