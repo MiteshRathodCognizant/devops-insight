@@ -113,7 +113,7 @@ class AzureDevOpsService {
 
   async getProjectInfo() {
     try {
-      const url = this.getApiUrl('../../_apis/projects?api-version=7.0');
+      const url = `${this.config?.organizationUrl}/_apis/projects?api-version=7.0`;
       const response = await fetch(url, {
         headers: this.getHeaders(),
       });
