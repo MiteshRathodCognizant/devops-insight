@@ -55,7 +55,13 @@ class AzureDevOpsService {
       throw new Error('Azure DevOps configuration not set');
     }
     
-    return `${this.config.organizationUrl}/${this.config.projectName}/_apis/${endpoint}`;
+    // Extract organization name from URL for proper API endpoint
+    const orgMatch = this.config.organizationUrl.match(/dev\.azure\.com\/([^\/]+)/);
+    if (!orgMatch) {
+      throw new Error('Invalid organization URL format');
+    }
+    
+    return `https://dev.azure.com/${orgMatch[1]}/${this.config.projectName}/_apis/${endpoint}`;
   }
 
   async getBuilds(top: number = 50): Promise<PipelineRun[]> {
@@ -113,7 +119,13 @@ class AzureDevOpsService {
 
   async getProjectInfo() {
     try {
-      const url = `${this.config?.organizationUrl}/_apis/projects?api-version=7.0`;
+      // Extract organization name from URL for proper API endpoint
+      const orgMatch = this.config?.organizationUrl.match(/dev\.azure\.com\/([^\/]+)/);
+      if (!orgMatch) {
+        throw new Error('Invalid organization URL format');
+      }
+      
+      const url = `https://dev.azure.com/${orgMatch[1]}/_apis/projects/${this.config?.projectName}?api-version=7.0`;
       const response = await fetch(url, {
         headers: this.getHeaders(),
       });
